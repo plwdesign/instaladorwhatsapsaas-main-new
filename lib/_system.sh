@@ -15,8 +15,19 @@ system_create_user() {
   sleep 2
 
   sudo su - root <<EOF
-  useradd -m -p $(openssl passwd -crypt ${mysql_root_password}) -s /bin/bash -G sudo deploy
-  usermod -aG sudo deploy
+  # Check if user already exists
+  if id "deploy" &>/dev/null; then
+    echo "User deploy already exists"
+  else
+    # Create user with home directory and proper shell
+    useradd -m -s /bin/bash deploy
+    # Add to sudo group
+    usermod -aG sudo deploy
+    # Set password
+    echo "deploy:${mysql_root_password}" | chpasswd
+    # Ensure sudo works without password
+    echo "deploy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/deploy
+  fi
 EOF
 
   sleep 2
@@ -32,12 +43,23 @@ system_git_clone() {
   printf "${WHITE} 💻 Fazendo download do código Whaticket...${GRAY_LIGHT}"
   printf "\n\n"
 
-
   sleep 2
 
-  sudo su - deploy <<EOF
-  git clone ${link_git} /home/deploy/${instancia_add}/
-EOF
+  # Solicita username e token
+  read -p "Digite seu GitHub username: " github_username
+  read -s -p "Digite seu GitHub token: " github_token
+  echo ""
+
+  # Constrói link com autenticação
+  if [[ $link_git == *"github.com"* ]]; then
+    repo_url=$(echo "$link_git" | sed -E "s#https://#https://${github_username}:${github_token}@#")
+    sudo -u deploy git clone "$repo_url" /home/deploy/${instancia_add}/
+  else
+    sudo -u deploy git clone "$link_git" /home/deploy/${instancia_add}/
+  fi
+
+  # Permissões
+  sudo chown -R deploy:deploy /home/deploy/${instancia_add}
 
   sleep 2
 }
@@ -55,8 +77,15 @@ system_update() {
   sleep 2
 
   sudo su - root <<EOF
-  apt -y update
-  sudo apt-get install -y libxshmfence-dev libgbm-dev wget unzip fontconfig locales gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get upgrade -y
+  apt-get install -y libxshmfence-dev libgbm-dev wget unzip fontconfig locales gconf-service \
+    libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 \
+    libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 \
+    libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 \
+    libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 \
+    ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils
 EOF
 
   sleep 2
@@ -281,7 +310,7 @@ system_node_install() {
   sleep 2
 
   sudo su - root <<EOF
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   apt-get install -y nodejs
   sleep 2
   npm install -g npm@latest
