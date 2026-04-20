@@ -304,23 +304,39 @@ EOF
 #######################################
 system_node_install() {
   print_banner
-  printf "${WHITE} 💻 Instalando nodejs...${GRAY_LIGHT}"
+  printf "${WHITE} 💻 Instalando nodejs ...${GRAY_LIGHT}"
   printf "\n\n"
 
   sleep 2
 
   sudo su - root <<EOF
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+
+  apt-get remove -y nodejs npm
+  apt-get autoremove -y
+  rm -rf /usr/lib/node_modules
+  rm -rf /root/.npm
+  rm -rf /home/deploy/.npm
+
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
+
+  corepack enable
+
+  npm install -g pm2
+
   sleep 2
-  npm install -g npm@latest
+
+  node -v
+  npm -v
+
   sleep 2
+
   sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-  wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-  sudo apt-get update -y && sudo apt-get -y install postgresql
-  sleep 2
-  sudo timedatectl set-timezone America/Sao_Paulo
-  
+  wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+  apt-get update -y && apt-get -y install postgresql
+
+  timedatectl set-timezone America/Sao_Paulo
+
 EOF
 
   sleep 2
